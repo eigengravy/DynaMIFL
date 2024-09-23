@@ -34,7 +34,7 @@ DEVICE_ARG = "cuda:1"
 # DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("mps")
 
-print("Device: {DEVICE}")
+print(f"Device: {DEVICE}")
 
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
 from workloads.cifar100 import client_fedavg_update, evaluate
@@ -43,11 +43,6 @@ from common import federated_averaging, calculate_mi
 import wandb
 
 
-# Set the partitioner to create 10 partitions
-# Example usage:
-# correlation, mutual_information = calculate_mi(model, teacher, dataloader)
-# print(f"Correlation coefficient (rho): {correlation}")
-# print(f"Mutual Information: {mutual_information}")i
 def federated_learning(
     num_clients: int,
     num_rounds: int,
@@ -59,10 +54,7 @@ def federated_learning(
     start = datetime.now()
 ):
     ALPHA  = 0.5
-    datasets = load_dataset(num_clients)
-    # client_loaders, test_loader = load_partition_cifar10(num_clients, batch_size, alpha)
     partitioner = DirichletPartitioner(num_partitions=num_clients , partition_by="fine_label" , alpha=ALPHA)
-
 
     test_loader, get_client_loader = load_dataset(partitioner)
 
@@ -89,24 +81,12 @@ def federated_learning(
         round_models = []
         round_mi = []
         for client_idx in participating_clients:
-            local_model = SimpleCNN().to(DEVICE)
-            teacher_model = SimpleCNN().to(DEVICE)
-            teacher_model.load_state_dict(local_models[client_idx].state_dict())
-            local_model.load_state_dict(global_model.state_dict())
             optimizer = optim.SGD(local_model.parameters(), lr=0.01, momentum=0.9)
             trainloader , _ = get_client_loader(client_idx)
-            local_model = client_fedavg_update(
-                local_model,
-                teacher_model,
-                optimizer,
-                # get_client_loader(client_idx),
-                trainloader,
-                local_epochs,
-                DEVICE
-            )
-            local_models[client_idx].load_state_dict(local_model.state_dict())
+            local_model = client_fedavg_update(global_model, local_models[client_idx], optimizer, trainloader, local_epochs, DEVICE)
             round_models.append(local_model)
-            mi , rho , modelA_outputs , modelB_outputs = calculate_mi(local_model, teacher_model, trainloader, DEVICE)
+            mi , rho , modelA_outputs , modelB_outputs = calculate_mi(local_model, local_models[client_idx], trainloader, DEVICE)
+            local_models[client_idx].load_state_dict(local_model.state_dict())
             round_mi.append(mi)
             mi_history[round][client_idx] = mi
 
@@ -158,21 +138,21 @@ if __name__ == "__main__":
     alpha = 0.1
     participation_fraction = 0.5
 
-    wandb.login()
+    # wandb.login()
 
-    run = wandb.init(
-        # Set the project where this run will be logged
-        project="fed-avg",
-        # Track hyperparameters and run metadata
-        config={
-            "num_clients": num_clients,
-            "num_rounds": num_rounds,
-            "local_epochs": local_epochs,
-            "batch_size": batch_size,
-            "alpha": alpha,
-            "participation_fraction": participation_fraction,
-        },
-    )
+    # run = wandb.init(
+    #     # Set the project where this run will be logged
+    #     project="fed-avg",
+    #     # Track hyperparameters and run metadata
+    #     config={
+    #         "num_clients": num_clients,
+    #         "num_rounds": num_rounds,
+    #         "local_epochs": local_epochs,
+    #         "batch_size": batch_size,
+    #         "alpha": alpha,
+    #         "participation_fraction": participation_fraction,
+    #     },
+    # )
 
     # wandb.log({"accuracy": acc, "loss": loss})
 

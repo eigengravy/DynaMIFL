@@ -12,8 +12,6 @@ import torch.nn as nn
 from models.simple_cnn import SimpleCNN
 import torch.optim as optim
 from typing import List, Tuple
-from flwr_datasets.partitioner import DirichletPartitioner
-
 
 
 def load_dataset(partitioners, batch_size=64, test_size=0.1):
@@ -67,7 +65,6 @@ def client_fedavg_update(
     epochs: int,
     device
 ) -> nn.Module:
-    # clone global model
     model = SimpleCNN().to(device)
     model.load_state_dict(global_model.state_dict())
     model.train()
@@ -76,8 +73,6 @@ def client_fedavg_update(
     
     for _ in range(epochs):
         for batch in train_loader:
-            # images, labels = images.to(device), labels.to(device)
-            # print(batch)
             images, labels = batch["img"].to(device), batch["fine_label"].to(device)
             optimizer.zero_grad()
             outputs = model(images)
@@ -115,7 +110,6 @@ def client_mifl_update(
     alpha: float,
     device
 ) -> nn.Module:
-    # clone global model
     model = SimpleCNN().to(device)
     model.load_state_dict(global_model.state_dict())
     model.train()
