@@ -84,7 +84,7 @@ def federated_learning(
             trainloader , _ = get_client_loader(client_idx)
             local_model = client_fedavg_update(global_model, local_models[client_idx], trainloader, local_epochs, DEVICE)
             round_models.append(local_model)
-            mi , rho , modelA_outputs , modelB_outputs = calculate_mi(local_model, local_models[client_idx], trainloader, DEVICE)
+            mi  = calculate_mi(local_model, local_models[client_idx], trainloader, DEVICE)
             local_models[client_idx].load_state_dict(local_model.state_dict())
             round_mi.append(mi)
             mi_history[round][client_idx] = mi
@@ -96,7 +96,7 @@ def federated_learning(
         losses.append(test_loss)
         accuracies.append(accuracy)
         print(
-            f"Round {round+1}/{num_rounds}: Test loss: {test_loss:.4f}, Accuracy: {accuracy:.4f} , rho: {rho} , model:{modelA_outputs} , modelB_outputs: {modelB_outputs} "
+            f"Round {round+1}/{num_rounds}: Test loss: {test_loss:.4f}, Accuracy: {accuracy:.4f}"
         )
         print(
             f"Min {min(round_mi)} Max {max(round_mi)} Mean {sum(round_mi)/len(round_mi)}"
