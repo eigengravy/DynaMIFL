@@ -35,6 +35,10 @@ DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 print("Device: {DEVICE}")
 
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
+from workloads.cifar100 import client_fedavg_update, evaluate
+from common import federated_averaging, calculate_mi
+
+import wandb
 
 
 # Set the partitioner to create 10 partitions
@@ -89,23 +93,24 @@ def federated_learning(
             teacher_model.load_state_dict(local_models[client_idx].state_dict())
             local_model.load_state_dict(global_model.state_dict())
             optimizer = optim.SGD(local_model.parameters(), lr=0.01, momentum=0.9)
-            local_model = client_update(
+            local_model = client_fedavg_update(
                 local_model,
+                teacher_model,
                 optimizer,
                 client_loaders[client_idx],
                 local_epochs,
-                teacher_model,
+                DEVICE
             )
             local_models[client_idx].load_state_dict(local_model.state_dict())
             round_models.append(local_model)
-            _, mi = calculate_mi(local_model, teacher_model, client_loaders[client_idx])
+            _, mi = calculate_mi(local_model, teacher_model, client_loaders[client_idx], DEVICE)
             round_mi.append(mi)
             mi_history[round][client_idx] = mi
 
         round_models = round_models[: int(0.8 * len(round_models))]
-        global_model = federated_averaging(round_models)
+        global_model = federated_averaging(round_models, DEVICE)
 
-        test_loss, accuracy = evaluate(global_model, test_loader)
+        test_loss, accuracy = evaluate(global_model, testloader, DEVICE)
         losses.append(test_loss)
         accuracies.append(accuracy)
         print(
@@ -149,6 +154,24 @@ if __name__ == "__main__":
     batch_size = 32
     alpha = 0.1
     participation_fraction = 0.5
+
+    wandb.login()
+
+    run = wandb.init(
+        # Set the project where this run will be logged
+        project="fed-avg",
+        # Track hyperparameters and run metadata
+        config={
+            "num_clients": num_clients,
+            "num_rounds": num_rounds,
+            "local_epochs": local_epochs,
+            "batch_size": batch_size,
+            "alpha": alpha,
+            "participation_fraction": participation_fraction,
+        },
+    )
+
+    # wandb.log({"accuracy": acc, "loss": loss})
 
     federated_learning(
         num_clients, num_rounds, local_epochs, batch_size, alpha, participation_fraction
