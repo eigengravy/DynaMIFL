@@ -60,4 +60,4 @@ def calculate_mi(modelA: nn.Module, modelB: nn.Module, dataloader: DataLoader, d
     rho, _ = pearsonr(modelA_outputs, modelB_outputs)
     mi = -0.5 * math.log(1 - rho**2)
 
-    return mi
+    return mi , rho

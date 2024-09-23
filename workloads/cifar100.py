@@ -76,6 +76,8 @@ def client_fedavg_update(
     
     for _ in range(epochs):
         for batch in train_loader:
+            # images, labels = images.to(device), labels.to(device)
+            # print(batch)
             images, labels = batch["img"].to(device), batch["fine_label"].to(device)
             optimizer.zero_grad()
             outputs = model(images)

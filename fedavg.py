@@ -31,7 +31,8 @@ from workloads.cifar100 import *
 from common import *
 
 DEVICE_ARG = "cuda:1"
-DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
+# DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("mps")
 
 print("Device: {DEVICE}")
 
@@ -93,28 +94,30 @@ def federated_learning(
             teacher_model.load_state_dict(local_models[client_idx].state_dict())
             local_model.load_state_dict(global_model.state_dict())
             optimizer = optim.SGD(local_model.parameters(), lr=0.01, momentum=0.9)
+            trainloader , _ = get_client_loader(client_idx)
             local_model = client_fedavg_update(
                 local_model,
                 teacher_model,
                 optimizer,
-                get_client_loader(client_idx),
+                # get_client_loader(client_idx),
+                trainloader,
                 local_epochs,
                 DEVICE
             )
             local_models[client_idx].load_state_dict(local_model.state_dict())
             round_models.append(local_model)
-            _, mi = calculate_mi(local_model, teacher_model, client_loaders[client_idx], DEVICE)
+            mi , rho , modelA_outputs , modelB_outputs = calculate_mi(local_model, teacher_model, trainloader, DEVICE)
             round_mi.append(mi)
             mi_history[round][client_idx] = mi
 
         round_models = round_models[: int(0.8 * len(round_models))]
         global_model = federated_averaging(round_models, DEVICE)
 
-        test_loss, accuracy = evaluate(global_model, testloader, DEVICE)
+        test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
         losses.append(test_loss)
         accuracies.append(accuracy)
         print(
-            f"Round {round+1}/{num_rounds}: Test loss: {test_loss:.4f}, Accuracy: {accuracy:.4f}"
+            f"Round {round+1}/{num_rounds}: Test loss: {test_loss:.4f}, Accuracy: {accuracy:.4f} , rho: {rho} , model:{modelA_outputs} , modelB_outputs: {modelB_outputs} "
         )
         print(
             f"Min {min(round_mi)} Max {max(round_mi)} Mean {sum(round_mi)/len(round_mi)}"
