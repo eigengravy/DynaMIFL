@@ -30,11 +30,8 @@ import math
 from models.simple_cnn import SimpleCNN
 from datasets.cifar100 import load_dataset
 
-from fedavg import DEVICE
-
-
-def federated_averaging(models: List[nn.Module]) -> nn.Module:
-    global_model = SimpleCNN().to(DEVICE)
+def federated_averaging(models: List[nn.Module], device) -> nn.Module:
+    global_model = SimpleCNN().to(device)
     global_dict = global_model.state_dict()
     for k in global_dict.keys():
         global_dict[k] = torch.stack(
@@ -44,7 +41,7 @@ def federated_averaging(models: List[nn.Module]) -> nn.Module:
     return global_model
 
 
-def calculate_mi(modelA: nn.Module, modelB: nn.Module, dataloader: DataLoader):
+def calculate_mi(modelA: nn.Module, modelB: nn.Module, dataloader: DataLoader, device):
     modelA.eval()
     modelB.eval()
 
@@ -53,7 +50,7 @@ def calculate_mi(modelA: nn.Module, modelB: nn.Module, dataloader: DataLoader):
 
     with torch.no_grad():
         for batch in dataloader:
-            images, _ = batch["img"].to(DEVICE), batch["fine_label"].to(DEVICE)
+            images, _ = batch["img"].to(device), batch["fine_label"].to(device)
             modelA_outputs.append(modelA(images).cpu().numpy())
             modelB_outputs.append(modelB(images).cpu().numpy())
 
