@@ -34,9 +34,10 @@ DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 
 print("Device: {DEVICE}")
 
+from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
 
 
-
+# Set the partitioner to create 10 partitions
 # Example usage:
 # correlation, mutual_information = calculate_mi(model, teacher, dataloader)
 # print(f"Correlation coefficient (rho): {correlation}")
@@ -44,12 +45,22 @@ print("Device: {DEVICE}")
 def federated_learning(
     num_clients: int,
     num_rounds: int,
-    local_epochs: int,    teacher: nn.Module,
-
+    local_epochs: int,
+    teacher: nn.Module,
+):
     start = datetime.now()
 
-    client_loaders, test_loader = load_partition_cifar10(num_clients, batch_size, alpha)
+    ALPHA = 0.5
+    testloader, get_client_loader = load_dataset(
+        {
+            "train": DirichletPartitioner(
+                num_partitions=num_clients, alpha=ALPHA, partition_by="fine_label"
+            )
+        }
+    )
 
+    client_loaders = [get_client_loader(str(i)) for i in range(num_clients)]
+    
     global_model = SimpleCNN().to(DEVICE)
     local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
 
