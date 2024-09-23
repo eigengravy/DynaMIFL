@@ -60,7 +60,7 @@ def federated_learning(
 
     global_model = SimpleCNN().to(DEVICE)
     local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
-
+    local_runs = [wandb.init(entity=str(i), project="fed-avg") for i in range(num_clients)]
     losses: List[float] = []
     accuracies: List[float] = []
 
@@ -82,18 +82,21 @@ def federated_learning(
         round_mi = []
         for client_idx in participating_clients:
             trainloader , _ = get_client_loader(client_idx)
-            local_model = client_fedavg_update(global_model, local_models[client_idx], trainloader, local_epochs, DEVICE)
+            local_model, ce_loss_sum, total_loss_sum = client_fedavg_update(global_model, local_models[client_idx], trainloader, local_epochs, DEVICE)
             round_models.append(local_model)
             mi  = calculate_mi(local_model, local_models[client_idx], trainloader, DEVICE)
-            wandb.log({"mi": mi , "client_idx": client_idx})
+            #wandb.log({"mi": mi , "client_idx": client_idx})
             local_models[client_idx].load_state_dict(local_model.state_dict())
             round_mi.append(mi)
             mi_history[round][client_idx] = mi
+
+            wandb.log({str(client_idx): {"ce_loss_sum": ce_loss_sum, "total_loss_sum": total_loss_sum, "mi": mi}}, commit=False)
 
         round_models = round_models[: int(0.8 * len(round_models))]
         global_model = federated_averaging(round_models, DEVICE)
 
         test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
+        wandb.log({"test_loss": test_loss, "accuracy": accuracy})
         losses.append(test_loss)
         accuracies.append(accuracy)
         print(
@@ -106,28 +109,29 @@ def federated_learning(
         max_mi.append(max(round_mi))
         mean_mi.append(sum(round_mi) / len(round_mi))
 
-    name = "fedavg"
-    with open(f"results/result-{hex(hash(time()))[2:]}.json", "w") as f:
-        dump = {
-            "name": name,
-            "time": start.isoformat(),
-            "num_clients": num_clients,
-            "num_rounds": num_rounds,
-            "local_epochs": local_epochs,
-            "batch_size": batch_size,
-            "alpha": alpha,
-            "participation_fraction": participation_fraction,
-            "losses": losses,
-            "accuracies": accuracies,
-            "min_mi": min_mi,
-            "max_mi": max_mi,
-            "mean_mi": mean_mi,
-            "mi_history": mi_history,
-        }
-        json.dump(
-            dump,
-            f,
-        )
+    # name = "fedavg"
+    # with open(f"results/result-{hex(hash(time()))[2:]}.json", "w") as f:
+    #     dump = {
+    #         "name": name,
+    #         "time": start.isoformat(),
+    #         "num_clients": num_clients,
+    #         "num_rounds": num_rounds,
+    #         "local_epochs": local_epochs,
+    #         "batch_size": batch_size,
+    #         "alpha": alpha,
+    #         "participation_fraction": participation_fraction,
+    #         "losses": losses,
+    #         "accuracies": accuracies,
+    #         "min_mi": min_mi,
+    #         "max_mi": max_mi,
+    #         "mean_mi": mean_mi,
+    #         "mi_history": mi_history,
+    #     }
+    #     json.dump(
+    #         dump,
+    #         f,
+    #     )
+    global_run.log({"losses":losses, "accuracies":accuracies, "min_mi":min_mi, "max_mi":max_mi, "mean_mi":mean_mi, "mi_history":mi_history})
 
 
 if __name__ == "__main__":
@@ -140,10 +144,8 @@ if __name__ == "__main__":
 
     wandb.login()
 
-    run = wandb.init(
-        # Set the project where this run will be logged
+    global_run = wandb.init(
         project="fed-avg",
-        # Track hyperparameters and run metadata
         config={
             "num_clients": num_clients,
             "num_rounds": num_rounds,
@@ -153,8 +155,6 @@ if __name__ == "__main__":
             "participation_fraction": participation_fraction,
         },
     )
-
-    # wandb.log({"accuracy": acc, "loss": loss})
 
     federated_learning(
         num_clients, num_rounds, local_epochs, batch_size, alpha, participation_fraction

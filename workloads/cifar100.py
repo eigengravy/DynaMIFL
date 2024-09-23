@@ -72,19 +72,22 @@ def client_fedavg_update(
 
     
     local_model.to(device)
-    
+    ce_loss_sum = 0
+    total_loss_sum = 0
     for _ in range(epochs):
         for batch in train_loader:
             images, labels = batch["img"].to(device), batch["fine_label"].to(device)
             optimizer.zero_grad()
             outputs = model(images)
             # TODO: Log
-            ce_loss = nn.functional.cross_entropy(outputs, labels)       
+            ce_loss = nn.functional.cross_entropy(outputs, labels)  
+            ce_loss_sum += ce_loss.item()     
             # TODO: Log    
             loss = ce_loss
+            total_loss_sum += loss.item()
             loss.backward()
             optimizer.step()
-    return model
+    return model, ce_loss_sum, total_loss_sum
 
 
 def evaluate(model: nn.Module, test_loader: DataLoader,device) -> Tuple[float, float]:
