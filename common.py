@@ -28,7 +28,6 @@ import math
 
 
 from models.simple_cnn import SimpleCNN
-from datasets.cifar100 import load_dataset
 
 def federated_averaging(models: List[nn.Module], device) -> nn.Module:
     global_model = SimpleCNN().to(device)

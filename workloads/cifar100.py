@@ -105,6 +105,7 @@ def client_mifl_update(
     optimizer: optim.Optimizer,
     train_loader: DataLoader,
     epochs: int,
+    alpha: float,
     device
 ) -> nn.Module:
     # clone global model
@@ -122,9 +123,11 @@ def client_mifl_update(
             # TODO: Log
             ce_loss = nn.functional.cross_entropy(outputs, labels)       
             # TODO: Log
+            with torch.no_grad():
+                local_ouputs = local_model(outputs, labels)
             # TODO: mi loss
-            # mi_loss =     
-            loss = ce_loss
+            mi_loss = nn.functional.cross_entropy(outputs, local_ouputs)
+            loss = ce_loss - alpha * mi_loss
             loss.backward()
             optimizer.step()
     return model
