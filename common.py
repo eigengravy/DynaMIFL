@@ -1,6 +1,40 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader, Subset
+import numpy as np
+from typing import List, Tuple
+import random
+from time import time
+import os
+import json
+from datetime import datetime
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import numpy as np
+from scipy.stats import pearsonr
+import math
 
-def federated_averaging(global_model: nn.Module, models: List[nn.Module]) -> nn.Module:
-    global_model = SimpleCNN().to(device)
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import numpy as np
+from scipy.stats import pearsonr
+import math
+
+
+from models.simple_cnn import SimpleCNN
+from datasets.cifar100 import load_dataset
+
+from fedavg import DEVICE
+
+
+def federated_averaging(models: List[nn.Module]) -> nn.Module:
+    global_model = SimpleCNN().to(DEVICE)
     global_dict = global_model.state_dict()
     for k in global_dict.keys():
         global_dict[k] = torch.stack(
@@ -10,35 +44,23 @@ def federated_averaging(global_model: nn.Module, models: List[nn.Module]) -> nn.
     return global_model
 
 
-def calculate_mi(model: nn.Module, teacher: nn.Module, dataloader: DataLoader):
-    model.eval()
-    teacher.eval()
-    
-    all_model_outputs = []
-    all_teacher_outputs = []
-    
+def calculate_mi(modelA: nn.Module, modelB: nn.Module, dataloader: DataLoader):
+    modelA.eval()
+    modelB.eval()
+
+    modelA_outputs = []
+    modelB_outputs = []
+
     with torch.no_grad():
         for batch in dataloader:
-            inputs = batch[0]  # Assuming the first element of the batch is the input
-            inputs = inputs.to(device) 
-            model_output = model(inputs).cpu().numpy()
-            teacher_output = teacher(inputs).cpu().numpy()
-            
-            all_model_outputs.append(model_output)
-            all_teacher_outputs.append(teacher_output)
-    
-    # Concatenate all outputs
-    all_model_outputs = np.concatenate(all_model_outputs, axis=0)
-    all_teacher_outputs = np.concatenate(all_teacher_outputs, axis=0)
-    
-    # Flatten the outputs if they're multi-dimensional
-    all_model_outputs = all_model_outputs.reshape(-1)
-    all_teacher_outputs = all_teacher_outputs.reshape(-1)
-    
-    # Calculate Pearson correlation coefficient
-    rho, _ = pearsonr(all_model_outputs, all_teacher_outputs)
-    
-    # Calculate Mutual Information
+            images, _ = batch["img"].to(DEVICE), batch["fine_label"].to(DEVICE)
+            modelA_outputs.append(modelA(images).cpu().numpy())
+            modelB_outputs.append(modelB(images).cpu().numpy())
+
+    modelA_outputs = np.concatenate(modelA_outputs, axis=0).reshape(-1)
+    modelB_outputs = np.concatenate(modelB_outputs, axis=0).reshape(-1)
+
+    rho, _ = pearsonr(modelA_outputs, modelB_outputs)
     mi = -0.5 * math.log(1 - rho**2)
-    
-    return rho, mi
+
+    return mi
