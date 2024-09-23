@@ -85,6 +85,7 @@ def federated_learning(
             local_model = client_fedavg_update(global_model, local_models[client_idx], trainloader, local_epochs, DEVICE)
             round_models.append(local_model)
             mi  = calculate_mi(local_model, local_models[client_idx], trainloader, DEVICE)
+            wandb.log({"mi": mi , "client_idx": client_idx})
             local_models[client_idx].load_state_dict(local_model.state_dict())
             round_mi.append(mi)
             mi_history[round][client_idx] = mi
@@ -137,21 +138,21 @@ if __name__ == "__main__":
     alpha = 0.1
     participation_fraction = 0.5
 
-    # wandb.login()
+    wandb.login()
 
-    # run = wandb.init(
-    #     # Set the project where this run will be logged
-    #     project="fed-avg",
-    #     # Track hyperparameters and run metadata
-    #     config={
-    #         "num_clients": num_clients,
-    #         "num_rounds": num_rounds,
-    #         "local_epochs": local_epochs,
-    #         "batch_size": batch_size,
-    #         "alpha": alpha,
-    #         "participation_fraction": participation_fraction,
-    #     },
-    # )
+    run = wandb.init(
+        # Set the project where this run will be logged
+        project="fed-avg",
+        # Track hyperparameters and run metadata
+        config={
+            "num_clients": num_clients,
+            "num_rounds": num_rounds,
+            "local_epochs": local_epochs,
+            "batch_size": batch_size,
+            "alpha": alpha,
+            "participation_fraction": participation_fraction,
+        },
+    )
 
     # wandb.log({"accuracy": acc, "loss": loss})
 
