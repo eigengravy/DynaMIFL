@@ -12,11 +12,15 @@ import torch.nn as nn
 from models.simple_cnn import SimpleCNN
 import torch.optim as optim
 from typing import List, Tuple
+from flwr_datasets.partitioner import DirichletPartitioner
+
+
 
 def load_dataset(partitioners, batch_size=64, test_size=0.1):
+
     fds = FederatedDataset(
         dataset="cifar100",
-        partitioners=partitioners,
+        partitioners={"train": partitioners},
     )
 
     def apply_transforms(batch):
@@ -36,6 +40,7 @@ def load_dataset(partitioners, batch_size=64, test_size=0.1):
     testloader = DataLoader(
         fds.load_split("test").with_transform(apply_transforms), batch_size=batch_size
     )
+    
 
     def get_client_loader(cid: str):
         client_dataset = fds.load_partition(int(cid), "train")

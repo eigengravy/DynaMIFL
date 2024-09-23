@@ -1,1 +1,5 @@
 torch
+flwr
+torchvision
+flwr_datasets
+scipy

@@ -27,7 +27,8 @@ from scipy.stats import pearsonr
 import math
 
 from models.simple_cnn import SimpleCNN
-from workloads.cifar100 import load_dataset
+from workloads.cifar100 import *
+from common import *
 
 DEVICE_ARG = "cuda:1"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
@@ -50,21 +51,20 @@ def federated_learning(
     num_clients: int,
     num_rounds: int,
     local_epochs: int,
-    teacher: nn.Module,
-):
+    batch_size: int,
+    alpha: float,
+    participation_fraction: float,
+
     start = datetime.now()
+):
+    ALPHA  = 0.5
+    datasets = load_dataset(num_clients)
+    # client_loaders, test_loader = load_partition_cifar10(num_clients, batch_size, alpha)
+    partitioner = DirichletPartitioner(num_partitions=num_clients , partition_by="fine_label" , alpha=ALPHA)
 
-    ALPHA = 0.5
-    testloader, get_client_loader = load_dataset(
-        {
-            "train": DirichletPartitioner(
-                num_partitions=num_clients, alpha=ALPHA, partition_by="fine_label"
-            )
-        }
-    )
 
-    client_loaders = [get_client_loader(str(i)) for i in range(num_clients)]
-    
+    test_loader, get_client_loader = load_dataset(partitioner)
+
     global_model = SimpleCNN().to(DEVICE)
     local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
 
@@ -97,7 +97,7 @@ def federated_learning(
                 local_model,
                 teacher_model,
                 optimizer,
-                client_loaders[client_idx],
+                get_client_loader(client_idx),
                 local_epochs,
                 DEVICE
             )

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class SimpleCNN(nn.Module):
-    def __init__(self, num_classes: int = 10) -> None:
+    def __init__(self, num_classes: int = 100) -> None:
         super(SimpleCNN, self).__init__()
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
