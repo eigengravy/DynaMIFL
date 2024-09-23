@@ -81,9 +81,8 @@ def federated_learning(
         round_models = []
         round_mi = []
         for client_idx in participating_clients:
-            optimizer = optim.SGD(local_model.parameters(), lr=0.01, momentum=0.9)
             trainloader , _ = get_client_loader(client_idx)
-            local_model = client_fedavg_update(global_model, local_models[client_idx], optimizer, trainloader, local_epochs, DEVICE)
+            local_model = client_fedavg_update(global_model, local_models[client_idx], trainloader, local_epochs, DEVICE)
             round_models.append(local_model)
             mi , rho , modelA_outputs , modelB_outputs = calculate_mi(local_model, local_models[client_idx], trainloader, DEVICE)
             local_models[client_idx].load_state_dict(local_model.state_dict())

@@ -60,7 +60,6 @@ def load_dataset(partitioners, batch_size=64, test_size=0.1):
 def client_fedavg_update(
     global_model: nn.Module,
     local_model: nn.Module,
-    optimizer: optim.Optimizer,
     train_loader: DataLoader,
     epochs: int,
     device
@@ -68,6 +67,9 @@ def client_fedavg_update(
     model = SimpleCNN().to(device)
     model.load_state_dict(global_model.state_dict())
     model.train()
+
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+
     
     local_model.to(device)
     
