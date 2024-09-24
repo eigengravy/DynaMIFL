@@ -34,7 +34,7 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project="mifl_lambda",
+    project="srs-mifl-lambda",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -112,8 +112,10 @@ for round in range(num_rounds):
             commit=False,
         )
 
-    lower_bound_mi = np.nanpercentile(mi, mifl_critical_value * 100)
-    upper_bound_mi = np.nanpercentile(mi, (1 - mifl_critical_value) * 100)
+    # print(f"Round {round}")
+    # print(f"{len(round_models)} {round_mis}")
+    lower_bound_mi = np.nanpercentile(round_mis, mifl_critical_value * 100)
+    upper_bound_mi = np.nanpercentile(round_mis, (1 - mifl_critical_value) * 100)
     merged = [
         _model
         for _mi, _model in zip(round_mis, round_models)
@@ -125,10 +127,10 @@ for round in range(num_rounds):
     test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
     wandb.log(
         {
-            "test_loss": test_loss,
+            "global_loss": test_loss,
             "lower_bound_mi": lower_bound_mi,
             "upper_bound_mi": upper_bound_mi,
-            "accuracy": accuracy,
+            "global_accuracy": accuracy,
             "aggregation_size": len(round_models),
         }
     )

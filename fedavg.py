@@ -28,7 +28,7 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project="fedavg",
+    project="srs-fedavg",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -91,8 +91,8 @@ for round in range(num_rounds):
     test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
     wandb.log(
         {
-            "test_loss": test_loss,
-            "accuracy": accuracy,
+            "global_loss": test_loss,
+            "global_accuracy": accuracy,
             "aggregation_size": aggregation_size,
         }
     )
