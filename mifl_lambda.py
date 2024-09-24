@@ -14,6 +14,8 @@ from workloads.cifar100 import (
 )
 import random
 import numpy as np
+from tqdm import tqdm
+
 
 DEVICE_ARG = "cuda:0"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
@@ -58,7 +60,7 @@ global_model = SimpleCNN().to(DEVICE)
 local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
 
 
-for round in range(num_rounds):
+for round in tqdm(range(num_rounds)):
     num_participating_clients = max(1, int(participation_fraction * num_clients))
     participating_clients = random.sample(range(num_clients), num_participating_clients)
 
