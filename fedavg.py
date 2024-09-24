@@ -28,7 +28,7 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project="mifl-update-30",
+    project="fedavg",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
