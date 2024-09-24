@@ -10,7 +10,7 @@ from workloads.cifar100 import (
     load_dataset,
     client_fedavg_update,
 )
-from numpy import random
+import random
 
 DEVICE_ARG = "cuda:0"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
