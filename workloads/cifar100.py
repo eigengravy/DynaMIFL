@@ -192,7 +192,7 @@ def client_mifl_update_anshul(
             mi_loss = nn.functional.cross_entropy(outputs, local_ouputs)
             mi_loss = torch.clamp(mi_loss, min=min_clamp, max=max_clamp)
             mi_loss_sum += mi_loss.item()
-            loss = ce_loss - calculate_lambda_anshul(model, local_model) * mi_loss
+            loss = ce_loss - calculate_lambda_anshul(outputs, local_ouputs) * mi_loss
             total_loss_sum += loss.item()
             loss.backward()
             optimizer.step()
