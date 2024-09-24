@@ -6,6 +6,7 @@ from common import federated_averaging
 from models.simple_cnn import SimpleCNN
 from workloads.cifar100 import (
     calculate_mi,
+    client_fedavg_update,
     client_mifl_update,
     evaluate,
     load_dataset,
@@ -66,18 +67,30 @@ for round in range(num_rounds):
         trainloader, valloader = get_client_loader(client_idx)
         model = SimpleCNN()
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-        ce_loss_sum, mi_loss_sum, total_loss_sum = client_mifl_update(
-            model,
-            global_model,
-            local_models[client_idx],
-            trainloader,
-            optimizer,
-            local_epochs,
-            DEVICE,
-            -mifl_clamp,
-            mifl_clamp,
-            mifl_lambda,
-        )
+        if round == 0:
+            ce_loss_sum, total_loss_sum = client_fedavg_update(
+                model,
+                global_model,
+                local_models[client_idx],
+                trainloader,
+                optimizer,
+                local_epochs,
+                DEVICE
+            )
+            mi_loss_sum = 0
+        else:
+            ce_loss_sum, mi_loss_sum, total_loss_sum = client_mifl_update(
+                model,
+                global_model,
+                local_models[client_idx],
+                trainloader,
+                optimizer,
+                local_epochs,
+                DEVICE,
+                -mifl_clamp,
+                mifl_clamp,
+                mifl_lambda,
+            )
         round_models.append(model)
         test_loss, accuracy = evaluate(model, valloader, DEVICE)
         mi = calculate_mi(model, local_models[client_idx], trainloader, DEVICE)
