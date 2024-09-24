@@ -119,12 +119,12 @@ for round in tqdm(range(num_rounds)):
     lower_bound_mi = np.nanpercentile(round_mis, mifl_critical_value * 100)
     upper_bound_mi = np.nanpercentile(round_mis, (1 - mifl_critical_value) * 100)
     merged = [
-        _model
+        (_mi, _model)
         for _mi, _model in zip(round_mis, round_models)
         if lower_bound_mi <= _mi <= upper_bound_mi
     ]
     merged.sort()
-    round_models = merged[: int(aggregation_size)]
+    round_models = [_model for (_mi, _model) in merged[: int(aggregation_size)]]
     federated_averaging(global_model, round_models, DEVICE)
     test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
     wandb.log(
