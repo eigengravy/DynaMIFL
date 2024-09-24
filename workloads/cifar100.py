@@ -159,3 +159,57 @@ def client_mifl_update(
             loss.backward()
             optimizer.step()
     return ce_loss_sum, mi_loss_sum, total_loss_sum
+
+def client_mifl_update_anshul(
+    model: nn.Module,
+    global_model: nn.Module,
+    local_model: nn.Module,
+    train_loader: DataLoader,
+    optimizer,
+    epochs: int,
+    device,
+    min_clamp: float,
+    max_clamp: float,
+    mi_loss_lambda: float,
+) -> nn.Module:
+    model.to(device)
+    model.load_state_dict(global_model.state_dict())
+    model.train()
+
+    local_model.to(device)
+    ce_loss_sum = 0
+    mi_loss_sum = 0
+    total_loss_sum = 0
+    for _ in range(epochs):
+        for batch in train_loader:
+            images, labels = batch["img"].to(device), batch["fine_label"].to(device)
+            optimizer.zero_grad()
+            outputs = model(images)
+            ce_loss = nn.functional.cross_entropy(outputs, labels)
+            ce_loss_sum += ce_loss.item()
+            with torch.no_grad():
+                local_ouputs = local_model(images)
+            mi_loss = nn.functional.cross_entropy(outputs, local_ouputs)
+            mi_loss = torch.clamp(mi_loss, min=min_clamp, max=max_clamp)
+            mi_loss_sum += mi_loss.item()
+            loss = ce_loss - calculate_lambda_anshul(model, local_model) * mi_loss
+            total_loss_sum += loss.item()
+            loss.backward()
+            optimizer.step()
+    return ce_loss_sum, mi_loss_sum, total_loss_sum
+
+
+def calculate_lambda_anshul(logits_g , logits_k):
+    logits_g = logits_g.float()
+    logits_k = logits_k.float()
+    mean_logits = (logits_g + logits_k) / 2
+    
+    deviation_g = logits_g - mean_logits
+    deviation_k = logits_k - mean_logits
+    
+    covariance = torch.mean(deviation_g * deviation_k)
+    sum_logits = logits_g.abs() + logits_k.abs()
+    cv = covariance.sum()/sum_logits.sum()
+    lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
+    
+    return lambda_val
