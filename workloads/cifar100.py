@@ -210,6 +210,9 @@ def calculate_lambda_anshul(logits_g , logits_k):
     covariance = torch.mean(deviation_g * deviation_k)
     sum_logits = logits_g.abs() + logits_k.abs()
     cv = covariance.sum()/sum_logits.sum()
-    lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
+    if cv == (1/2):
+        lambda_val = 0.5
+    else:
+        lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
     
     return lambda_val
