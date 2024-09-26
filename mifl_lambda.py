@@ -18,7 +18,8 @@ from tqdm import tqdm
 
 
 DEVICE_ARG = "cuda:0"
-DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
+# DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("mps")
 
 print(f"Device: {DEVICE}")
 
@@ -36,7 +37,7 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project="srs-mifl-lambda",
+    project="new-lambda-anshul",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,

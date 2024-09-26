@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from flwr_datasets import FederatedDataset
 from scipy.stats import pearsonr
+from sklearn.metrics import mutual_info_score
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Lambda, Normalize, ToTensor
 
@@ -192,7 +193,7 @@ def client_mifl_update_anshul(
             mi_loss = nn.functional.cross_entropy(outputs, local_ouputs)
             mi_loss = torch.clamp(mi_loss, min=min_clamp, max=max_clamp)
             mi_loss_sum += mi_loss.item()
-            loss = ce_loss - calculate_lambda_anshul(outputs, local_ouputs) * mi_loss
+            loss = ce_loss - calculate_lambda_anshul2(outputs, local_ouputs) * mi_loss
             total_loss_sum += loss.item()
             loss.backward()
             optimizer.step()
@@ -210,9 +211,41 @@ def calculate_lambda_anshul(logits_g , logits_k):
     covariance = torch.mean(deviation_g * deviation_k)
     sum_logits = logits_g.abs() + logits_k.abs()
     cv = covariance.sum()/sum_logits.sum()
-    if cv == (1/2):
-        lambda_val = 0.5
-    else:
-        lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
+    
+    lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
     
     return lambda_val
+
+
+def calculate_lambda_anshul2(logits_g, logits_k):
+    logits_g = logits_g.float()
+    logits_k = logits_k.float()
+
+    modelA_outputs = []
+    modelB_outputs = []
+
+    modelA_outputs.append(logits_g.detach().cpu().numpy())
+    modelB_outputs.append(logits_k.detach().cpu().numpy())
+
+    modelA_outputs = np.concatenate(modelA_outputs, axis=0).reshape(-1)
+    modelB_outputs = np.concatenate(modelB_outputs, axis=0).reshape(-1)
+
+    std_g = torch.std(torch.tensor(modelA_outputs))
+    std_k = torch.std(torch.tensor(modelB_outputs))
+
+    rho, _ = pearsonr(modelA_outputs, modelB_outputs)
+
+    mis = mutual_info_score(modelA_outputs, modelB_outputs)
+
+    mi = -0.5 * math.log(1 - rho**2)
+
+    summation = np.abs(modelA_outputs) + np.abs(modelB_outputs)
+
+    cov = mi * std_g * std_k
+
+    cv = cov.sum() / summation.sum()
+
+    lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
+
+    return lambda_val
+
