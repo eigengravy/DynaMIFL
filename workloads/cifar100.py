@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from scipy.stats import kendalltau
 from flwr_datasets import FederatedDataset
 from flwr_datasets import FederatedDataset
 from scipy.stats import pearsonr
