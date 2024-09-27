@@ -18,8 +18,8 @@ from tqdm import tqdm
 
 
 DEVICE_ARG = "cuda:0"
-# DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
-DEVICE = torch.device("mps")
+DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
+#DEVICE = torch.device("mps")
 
 print(f"Device: {DEVICE}")
 

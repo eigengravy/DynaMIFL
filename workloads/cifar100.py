@@ -13,8 +13,7 @@ from torchvision.transforms import Compose, Lambda, Normalize, ToTensor
 from scipy.stats import kendalltau
 import math
 
-
-mine = MINE()
+#mine = MINE()
 
 
 def load_dataset(partitioners, batch_size=64, test_size=0.1):
@@ -270,8 +269,10 @@ def calculate_lambda_anshul2(logits_g, logits_k , k=3):
     modelA_outputs = []
     modelB_outputs = []
 
-    modelA_outputs.append(logits_g.detach().cpu().numpy())
-    modelB_outputs.append(logits_k.detach().cpu().numpy())
+    # modelA_outputs.append(logits_g.detach().cpu().numpy())
+    # modelB_outputs.append(logits_k.detach().cpu().numpy())
+    modelA_outputs.append(logits_g.detach().cpu())
+    modelB_outputs.append(logits_k.detach().cpu())
 
     modelA_outputs = np.concatenate(modelA_outputs, axis=0).reshape(-1)
     modelB_outputs = np.concatenate(modelB_outputs, axis=0).reshape(-1)
