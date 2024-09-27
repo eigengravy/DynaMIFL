@@ -2,6 +2,7 @@ import math
 from typing import Tuple
 
 import numpy as np
+from scipy.stats import kendalltau
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -194,11 +195,11 @@ def client_mifl_update_anshul(
             with torch.no_grad():
                 local_outputs = local_model(images)
             mi_loss = nn.functional.cross_entropy(outputs, local_outputs)
-            print(mi_loss.item())
+#            print(mi_loss.item())
             mi_loss = torch.clamp(mi_loss, min=min_clamp, max=max_clamp)
             mi_loss_sum += mi_loss.item()
-            lambda_val = calculate_lambda_anshul2(outputs, local_outputs, labels)
-            print(lambda_val)
+            lambda_val = calculate_lambda_anshul2(outputs, local_outputs)
+#            print(lambda_val)
             loss = ce_loss - lambda_val * mi_loss
             total_loss_sum += loss.item()
             loss.backward()

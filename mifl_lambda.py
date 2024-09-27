@@ -36,7 +36,7 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project="mifl-lambda-aaron_2-base",
+    project="final-mifl-lambda-base",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,

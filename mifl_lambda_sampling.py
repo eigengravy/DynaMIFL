@@ -1,6 +1,7 @@
 import torch
 from torch import optim
 import wandb
+import statistics
 from flwr_datasets.partitioner import DirichletPartitioner
 from common import federated_averaging
 from models.simple_cnn import SimpleCNN
@@ -17,7 +18,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-DEVICE_ARG = "cuda:0"
+DEVICE_ARG = "cuda:1"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 
 print(f"Device: {DEVICE}")
@@ -33,10 +34,17 @@ mifl_clamp = 5
 mifl_critical_value = 0.025
 aggregation_size = 0.8 * participation_fraction * num_clients
 
+mi_hist = [[1] for _ in range(num_clients)]
+mean_mi = []
+inverse_mi = []
+prob_mi = []
+
+
+
 wandb.login()
 
 wandb.init(
-    project="final-mifl-lambda-crit-increase",
+    project="htest-mi-sampling",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -61,10 +69,41 @@ local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
 
 for round in tqdm(range(num_rounds)):
     num_participating_clients = max(1, int(participation_fraction * num_clients))
-    participating_clients = random.sample(range(num_clients), num_participating_clients)
 
-    if round % 10 == 0 and round > 0:
-        mifl_critical_value += 0.025
+    # weighted sampling based on mi
+    for client_idx in range(num_clients):
+        meanmi = statistics.mean(mi_hist[client_idx])
+        print(f"MEAN MI: {meanmi}")
+        mean_mi.append(meanmi)
+        
+
+
+    for mean in mean_mi:
+        inverse = 1/mean
+        inverse_mi.append(inverse)
+
+    inverse_sum = sum(inverse_mi)
+    print(f"INVERSE SUM: {inverse_sum}")
+
+    for inverse in inverse_mi:
+        prob = inverse/inverse_sum
+        prob_mi.append(prob)
+
+    print(f"PROB MI of {round}")
+    print(prob_mi)
+
+    if round < 5:
+        participating_clients = random.sample(range(num_clients), num_participating_clients)
+        print("PARTICIPATING CLIENTS")
+        print(participating_clients)
+    else:
+        participating_clients = np.random.choice(range(num_clients), num_participating_clients, prob_mi)
+        participating_clients = participating_clients.tolist()
+        print("PARTICIPATING CLIENTS")
+        print(participating_clients)
+
+#    if round % 10 == 0 and round > 0:
+#        mifl_critical_value -= 0.025
 
     round_models = []
     round_mis = []
@@ -102,6 +141,9 @@ for round in tqdm(range(num_rounds)):
         local_models[client_idx].load_state_dict(model.state_dict())
         round_mis.append(mi)
 
+        mi_hist[client_idx].append(mi)
+
+        
         wandb.log(
             {
                 str(client_idx): {
@@ -115,6 +157,11 @@ for round in tqdm(range(num_rounds)):
             },
             commit=False,
         )
+
+    mean_mi.clear() 
+    inverse_mi.clear()
+    prob_mi.clear()
+
 
     # print(f"Round {round}")
     # print(f"{len(round_models)} {round_mis}")
