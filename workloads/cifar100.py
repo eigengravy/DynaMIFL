@@ -197,8 +197,8 @@ def client_mifl_update_anshul(
             print(mi_loss.item())
             mi_loss = torch.clamp(mi_loss, min=min_clamp, max=max_clamp)
             mi_loss_sum += mi_loss.item()
-            lambda_val = calc_lambda_aaron_2(outputs, local_outputs, labels)
-          #  print(lambda_val)
+            lambda_val = calculate_lambda_anshul2(outputs, local_outputs, labels)
+            print(lambda_val)
             loss = ce_loss - lambda_val * mi_loss
             total_loss_sum += loss.item()
             loss.backward()
@@ -219,6 +219,35 @@ def calculate_lambda_anshul(logits_g , logits_k):
     cv = covariance.sum()/sum_logits.sum()
     lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
     
+    return lambda_val
+
+def calculate_lambda_anshul2(logits_g, logits_k):
+    logits_g = logits_g.float()
+    logits_k = logits_k.float()
+
+    modelA_outputs = []
+    modelB_outputs = []
+
+    modelA_outputs.append(logits_g.detach().cpu().numpy())
+    modelB_outputs.append(logits_k.detach().cpu().numpy())
+ 
+
+    modelA_outputs = np.concatenate(modelA_outputs, axis=0).reshape(-1)
+    modelB_outputs = np.concatenate(modelB_outputs, axis=0).reshape(-1)
+
+    std_g = torch.std(torch.tensor(modelA_outputs))
+    std_k = torch.std(torch.tensor(modelB_outputs))
+
+    tau , _ = kendalltau(modelA_outputs, modelB_outputs)
+    
+    summation = np.abs(modelA_outputs) + np.abs(modelB_outputs)
+
+    cov = tau * std_g * std_k
+
+    cv = cov.sum() / summation.sum()
+
+    lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
+
     return lambda_val
 
 def calculate_lambda_aaron(Fg_output, Fk_output, true_vals):
