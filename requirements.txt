@@ -3,3 +3,6 @@ flwr
 torchvision
 flwr_datasets
 scipy
+wandb
+numpy
+typing
