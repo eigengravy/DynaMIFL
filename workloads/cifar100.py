@@ -269,10 +269,9 @@ def calculate_lambda_anshul2(logits_g, logits_k , k=3):
     modelA_outputs = []
     modelB_outputs = []
 
-    # modelA_outputs.append(logits_g.detach().cpu().numpy())
-    # modelB_outputs.append(logits_k.detach().cpu().numpy())
-    modelA_outputs.append(logits_g.detach().cpu())
-    modelB_outputs.append(logits_k.detach().cpu())
+    modelA_outputs.append(logits_g.detach().cpu().numpy())
+    modelB_outputs.append(logits_k.detach().cpu().numpy())
+ 
 
     modelA_outputs = np.concatenate(modelA_outputs, axis=0).reshape(-1)
     modelB_outputs = np.concatenate(modelB_outputs, axis=0).reshape(-1)
@@ -280,20 +279,11 @@ def calculate_lambda_anshul2(logits_g, logits_k , k=3):
     std_g = torch.std(torch.tensor(modelA_outputs))
     std_k = torch.std(torch.tensor(modelB_outputs))
 
-    rho, _ = pearsonr(modelA_outputs, modelB_outputs)
-
-    # mine.compute_score(modelA_outputs, modelB_outputs)
-
-    # mic = mine.mic()
-    # tau , _ = kendalltau(modelA_outputs, modelB_outputs)
-
-    mis = mutual_information(modelA_outputs.unsqueeze(1), modelB_outputs.unsqueeze(1), k=k)
-
-    mi = -0.5 * math.log(1 - rho**2)
-
+    tau , _ = kendalltau(modelA_outputs, modelB_outputs)
+    
     summation = np.abs(modelA_outputs) + np.abs(modelB_outputs)
 
-    cov = mis * std_g * std_k
+    cov = tau * std_g * std_k
 
     cv = cov.sum() / summation.sum()
 
