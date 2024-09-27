@@ -197,7 +197,7 @@ def client_mifl_update_anshul(
             print(mi_loss.item())
             mi_loss = torch.clamp(mi_loss, min=min_clamp, max=max_clamp)
             mi_loss_sum += mi_loss.item()
-            lambda_val = calculate_lambda_anshul2(outputs, local_outputs, labels)
+            lambda_val = calculate_lambda_anshul2(outputs, local_outputs)
             print(lambda_val)
             loss = ce_loss - lambda_val * mi_loss
             total_loss_sum += loss.item()
