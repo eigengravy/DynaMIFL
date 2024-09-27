@@ -17,7 +17,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-DEVICE_ARG = "cuda:1"
+DEVICE_ARG = "cuda:0"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 
 print(f"Device: {DEVICE}")
@@ -36,7 +36,7 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project="mifl-lambda-aaron_2-base",
+    project="mifl-lambda-aaron-crit-increase",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -63,8 +63,8 @@ for round in tqdm(range(num_rounds)):
     num_participating_clients = max(1, int(participation_fraction * num_clients))
     participating_clients = random.sample(range(num_clients), num_participating_clients)
 
-#    if round % 10 == 0 and round > 0:
-#        mifl_critical_value -= 0.025
+    if round % 10 == 0 and round > 0:
+        mifl_critical_value += 0.025
 
     round_models = []
     round_mis = []

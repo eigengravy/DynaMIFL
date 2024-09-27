@@ -4,6 +4,7 @@ import wandb
 from flwr_datasets.partitioner import DirichletPartitioner
 from common import federated_averaging
 from models.simple_cnn import SimpleCNN
+from models.resnet50 import ResNet50
 from workloads.cifar100 import (
     calculate_mi,
     client_fedavg_update,
@@ -17,7 +18,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-DEVICE_ARG = "cuda:1"
+DEVICE_ARG = "cuda:0"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 
 print(f"Device: {DEVICE}")
@@ -32,11 +33,12 @@ mifl_lambda = 0.4
 mifl_clamp = 5
 mifl_critical_value = 0.025
 aggregation_size = 0.8 * participation_fraction * num_clients
+net = ResNet50()
 
 wandb.login()
 
 wandb.init(
-    project="mifl-lambda-aaron_2-base",
+    project="mifl-lambda-resnet-base",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -45,9 +47,7 @@ wandb.init(
         "parition_alpha": partition_alpha,
         "mifl_lambda": mifl_lambda,
         "mifl_clamp": mifl_clamp,
-        "participation_fraction": participation_fraction,
-    },
-)
+        "participation_fraction": participation_fraction, },)
 
 partitioner = DirichletPartitioner(
     num_partitions=num_clients, partition_by="fine_label", alpha=partition_alpha
@@ -55,8 +55,8 @@ partitioner = DirichletPartitioner(
 
 test_loader, get_client_loader = load_dataset(partitioner)
 
-global_model = SimpleCNN().to(DEVICE)
-local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
+global_model = ResNet50().to(DEVICE)
+local_models = [ResNet50().to(DEVICE) for _ in range(num_clients)]
 
 
 for round in tqdm(range(num_rounds)):
@@ -70,7 +70,7 @@ for round in tqdm(range(num_rounds)):
     round_mis = []
     for client_idx in participating_clients:
         trainloader, valloader = get_client_loader(client_idx)
-        model = SimpleCNN()
+        model = ResNet50().to(DEVICE)
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
         if round == 0:
             ce_loss_sum, total_loss_sum = client_fedavg_update(

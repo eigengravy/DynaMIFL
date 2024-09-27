@@ -30,13 +30,13 @@ partition_alpha = 0.1
 participation_fraction = 0.3
 mifl_lambda = 0.4
 mifl_clamp = 5
-mifl_critical_value = 0.025
+mifl_critical_value = 0.275
 aggregation_size = 0.8 * participation_fraction * num_clients
 
 wandb.login()
 
 wandb.init(
-    project="mifl-lambda-aaron_2-base",
+    project="mifl-lambda-aaron-crit-decrease",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -63,8 +63,8 @@ for round in tqdm(range(num_rounds)):
     num_participating_clients = max(1, int(participation_fraction * num_clients))
     participating_clients = random.sample(range(num_clients), num_participating_clients)
 
-#    if round % 10 == 0 and round > 0:
-#        mifl_critical_value -= 0.025
+    if round % 10 == 0 and round > 0:
+        mifl_critical_value -= 0.025
 
     round_models = []
     round_mis = []
@@ -74,9 +74,7 @@ for round in tqdm(range(num_rounds)):
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
         if round == 0:
             ce_loss_sum, total_loss_sum = client_fedavg_update(
-                model,
-                global_model,
-                local_models[client_idx],
+                model, global_model, local_models[client_idx],
                 trainloader,
                 optimizer,
                 local_epochs,

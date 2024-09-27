@@ -15,6 +15,7 @@ from workloads.cifar100 import (
 import random
 import numpy as np
 from tqdm import tqdm
+import sys
 
 
 DEVICE_ARG = "cuda:1"
@@ -30,13 +31,13 @@ partition_alpha = 0.1
 participation_fraction = 0.3
 mifl_lambda = 0.4
 mifl_clamp = 5
-mifl_critical_value = 0.025
+mifl_critical_value = float(sys.argv[1])
 aggregation_size = 0.8 * participation_fraction * num_clients
 
 wandb.login()
 
 wandb.init(
-    project="mifl-lambda-aaron_2-base",
+    project=f"mifl-lambda-critfixed-{mifl_critical_value}",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
