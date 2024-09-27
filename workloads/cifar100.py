@@ -6,9 +6,15 @@ import torch
 import torch.nn as nn
 from flwr_datasets import FederatedDataset
 from scipy.stats import pearsonr
-from sklearn.metrics import mutual_info_score
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Lambda, Normalize, ToTensor
+
+# from minepy import MINE
+from scipy.stats import kendalltau
+import math
+
+
+mine = MINE()
 
 
 def load_dataset(partitioners, batch_size=64, test_size=0.1):
@@ -216,8 +222,48 @@ def calculate_lambda_anshul(logits_g , logits_k):
     
     return lambda_val
 
+def knn_entropy(X, k=3):
+    """
+    Estimate the entropy of continuous random variable X using k-nearest neighbors.
+    X: PyTorch tensor of shape (n_samples, n_features)
+    k: Number of nearest neighbors
+    Returns: Entropy estimate
+    """
+    n = X.shape[0]
+    
+    # Pairwise distances between points in X
+    dist = torch.cdist(X, X, p=2)
+    
+    # Sort distances and get the distance to the k-th nearest neighbor
+    knn_distances, _ = torch.topk(dist, k+1, largest=False)  # k+1 because the closest point is itself
+    knn_distance = knn_distances[:, k]  # k-th nearest neighbor distance
+    
+    # Compute entropy using KNN estimate
+    volume_unit_ball = (math.pi ** (X.shape[1] / 2)) / math.gamma(X.shape[1] / 2 + 1)  # Volume of d-dimensional unit ball
+    entropy_estimate = - torch.mean(torch.log(knn_distance)) + torch.log(torch.tensor(volume_unit_ball)) + math.log(n) - math.log(k)
+    
+    return entropy_estimate
 
-def calculate_lambda_anshul2(logits_g, logits_k):
+# Function to estimate mutual information using KNN
+def mutual_information(X, Y, k=3):
+    """
+    Estimate the mutual information between continuous variables X and Y using k-nearest neighbors.
+    X: PyTorch tensor of shape (n_samples, n_features)
+    Y: PyTorch tensor of shape (n_samples, n_features)
+    k: Number of nearest neighbors
+    Returns: Mutual information estimate
+    """
+    H_X = knn_entropy(X, k)      # Entropy of X
+    H_Y = knn_entropy(Y, k)      # Entropy of Y
+    H_XY = knn_entropy(torch.cat([X, Y], dim=1), k)  # Joint entropy of X and Y
+    
+    # Mutual information
+    MI = H_X + H_Y - H_XY
+    
+    return MI
+
+
+def calculate_lambda_anshul2(logits_g, logits_k , k=3):
     logits_g = logits_g.float()
     logits_k = logits_k.float()
 
@@ -235,13 +281,18 @@ def calculate_lambda_anshul2(logits_g, logits_k):
 
     rho, _ = pearsonr(modelA_outputs, modelB_outputs)
 
-    mis = mutual_info_score(modelA_outputs, modelB_outputs)
+    # mine.compute_score(modelA_outputs, modelB_outputs)
+
+    # mic = mine.mic()
+    # tau , _ = kendalltau(modelA_outputs, modelB_outputs)
+
+    mis = mutual_information(modelA_outputs.unsqueeze(1), modelB_outputs.unsqueeze(1), k=k)
 
     mi = -0.5 * math.log(1 - rho**2)
 
     summation = np.abs(modelA_outputs) + np.abs(modelB_outputs)
 
-    cov = mi * std_g * std_k
+    cov = mis * std_g * std_k
 
     cv = cov.sum() / summation.sum()
 
