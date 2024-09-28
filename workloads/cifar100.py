@@ -90,6 +90,8 @@ def calculate_mi(modelA: nn.Module, modelB: nn.Module, dataloader: DataLoader, d
     modelB_outputs = np.concatenate(modelB_outputs, axis=0).reshape(-1)
 
     rho, _ = pearsonr(modelA_outputs, modelB_outputs)
+    if rho >= 1:
+        rho = rho - 0.000001
 #    rho = rho - 0.000001
 #    print(f"RHO = {rho}")
     mi = -0.5 * math.log(1 - rho**2)
