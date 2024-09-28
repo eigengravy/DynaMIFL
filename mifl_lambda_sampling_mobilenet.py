@@ -46,7 +46,7 @@ prob_mi = []
 wandb.login()
 
 wandb.init(
-    project="samplingh2",
+    project="sampling-mobilenet",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,

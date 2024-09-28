@@ -38,7 +38,7 @@ net = mobilenetv2()
 wandb.login()
 
 wandb.init(
-    project="mifl-mobilenet-base",
+    project="mifl-mobilenet-critup",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
