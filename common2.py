@@ -75,3 +75,8 @@ def load_partition_cifar10(
     test_loader = DataLoader(testset, batch_size=batch_size, shuffle=False)
 
     return client_loaders, test_loader
+
+def MobileNetv2(num_classes: int = 1000, is_pretrained: bool = False) -> nn.Module:
+    model = torch.hub.load('pytorch/vision:v0.10.0', 'mobilenet_v2', pretrained=is_pretrained)
+    model.classifier[1] = nn.Linear(model.last_channel, num_classes)
+    return model
