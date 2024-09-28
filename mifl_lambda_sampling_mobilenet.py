@@ -1,9 +1,11 @@
 import torch
 from torch import optim
 import wandb
+import statistics
 from flwr_datasets.partitioner import DirichletPartitioner
 from common import federated_averaging
 from models.simple_cnn import SimpleCNN
+from models.mobilenetv2 import mobilenetv2
 from workloads.cifar100 import (
     calculate_mi,
     client_fedavg_update,
@@ -15,11 +17,11 @@ from workloads.cifar100 import (
 import random
 import numpy as np
 from tqdm import tqdm
+from operator import itemgetter
 
 
 DEVICE_ARG = "cuda:1"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
-# DEVICE = torch.device("mps")
 
 print(f"Device: {DEVICE}")
 
@@ -34,16 +36,17 @@ mifl_clamp = 5
 mifl_critical_value = 0.025
 aggregation_size = 0.8 * participation_fraction * num_clients
 
+mi_hist = [[1] for _ in range(num_clients)]
+mean_mi = []
+inverse_mi = []
+prob_mi = []
+
+
+
 wandb.login()
 
-client_mi = [[1] for _ in range(num_clients)]  # Each client has its own list of MI values
-# mean_mi = [1 for _ in range(num_clients)]
-inverse_mean = np.zeros(num_clients)
-prob_mi = [1/(num_clients) for _ in range(num_clients)]  # 1D list of probabilities
-
-
 wandb.init(
-    project="I-GIVE-UP",
+    project="samplingh2",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -52,7 +55,6 @@ wandb.init(
         "parition_alpha": partition_alpha,
         "mifl_lambda": mifl_lambda,
         "mifl_clamp": mifl_clamp,
-        "mifl_critical_value": mifl_critical_value,
         "participation_fraction": participation_fraction,
     },
 )
@@ -63,63 +65,54 @@ partitioner = DirichletPartitioner(
 
 test_loader, get_client_loader = load_dataset(partitioner)
 
-global_model = SimpleCNN().to(DEVICE)
-local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
+global_model = mobilenetv2().to(DEVICE)
+local_models = [mobilenetv2().to(DEVICE) for _ in range(num_clients)]
+
 
 for round in tqdm(range(num_rounds)):
-
-    # for client_idx in range(num_clients):
-    #     mean_mi = np.mean(client_mi[client_idx])
-    #     inverse_mean[client_idx-1] = 1 / mean_mi
-    # sum_prob = np.sum(inverse_mean)
-    # for client_idx in range(num_clients):
-    #     prob_mi[client_idx] = inverse_mean[client_idx] / sum_prob
-    
-    # print(prob_mi)
-    def calculate_client_probabilities(client_mi, num_clients):
-        inverse_mean = np.zeros(num_clients)
-        prob_mi = np.zeros(num_clients)
-
-        for client_idx in range(num_clients):
-            mean_mi = np.mean(client_mi[client_idx])
-            if mean_mi != 0:
-                inverse_mean[client_idx] = 1 / mean_mi
-            else:
-                inverse_mean[client_idx] = 0  # or handle this case as appropriate
-
-        sum_prob = np.sum(inverse_mean)
-
-        if sum_prob != 0:
-            prob_mi = inverse_mean / sum_prob
-        else:
-            prob_mi = np.ones(num_clients) / num_clients  # Equal probabilities if sum is zero
-
-        return prob_mi.tolist()
-    
-    prob_mi = calculate_client_probabilities(client_mi, num_clients)
-    print(f"PROB MI {round}")
-    print(prob_mi)
-    print(f"ProbSum: {sum(prob_mi)}")
-    
     num_participating_clients = max(1, int(participation_fraction * num_clients))
+
+    # weighted sampling based on mi
+    for client_idx in range(num_clients):
+        meanmi = statistics.mean(mi_hist[client_idx])
+        print(f"MEAN MI: {meanmi}")
+        mean_mi.append(meanmi)
+        
+
+
+    for mean in mean_mi:
+        inverse = 1/mean
+        inverse_mi.append(inverse)
+
+    inverse_sum = sum(inverse_mi)
+    print(f"INVERSE SUM: {inverse_sum}")
+
+    for inverse in inverse_mi:
+        prob = inverse/inverse_sum
+        prob_mi.append(prob)
+
+    print(f"PROB MI of {round}")
+    print(prob_mi)
+    print(sum(prob_mi))
+
     if round < 25:
         participating_clients = random.sample(range(num_clients), num_participating_clients)
         print("PARTICIPATING CLIENTS")
         print(participating_clients)
     else:
-        participating_clients = np.random.choice(range(num_clients) , num_participating_clients , prob_mi)
-        print("PART CLIENTS")
+        participating_clients = np.random.choice(range(num_clients), num_participating_clients, False, prob_mi)
+        participating_clients = participating_clients.tolist()
+        print("PARTICIPATING CLIENTS")
         print(participating_clients)
 
-    # mean_mi.clear()
-    prob_mi = []
-    inverse_mean = []
+#    if round % 10 == 0 and round > 0:
+#        mifl_critical_value -= 0.025
 
     round_models = []
     round_mis = []
     for client_idx in participating_clients:
         trainloader, valloader = get_client_loader(client_idx)
-        model = SimpleCNN()
+        model = mobilenetv2()
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
         if round == 0:
             ce_loss_sum, total_loss_sum = client_fedavg_update(
@@ -151,8 +144,8 @@ for round in tqdm(range(num_rounds)):
         local_models[client_idx].load_state_dict(model.state_dict())
         round_mis.append(mi)
 
-        # Update MI and mean for the current client
-        client_mi[client_idx].append(mi)
+        mi_hist[client_idx].append(mi)
+
         
         wandb.log(
             {
@@ -167,8 +160,11 @@ for round in tqdm(range(num_rounds)):
             },
             commit=False,
         )
-        
-    
+
+    mean_mi.clear() 
+    inverse_mi.clear()
+    prob_mi.clear()
+
 
     # print(f"Round {round}")
     # print(f"{len(round_models)} {round_mis}")
@@ -179,7 +175,8 @@ for round in tqdm(range(num_rounds)):
         for _mi, _model in zip(round_mis, round_models)
         if lower_bound_mi <= _mi <= upper_bound_mi
     ]
-    merged.sort()
+    merged.sort(key = lambda i:i[0])
+#    sorted(merged,key=itemgetter(0))
     round_models = [_model for (_mi, _model) in merged[: int(aggregation_size)]]
     federated_averaging(global_model, round_models, DEVICE)
     test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
@@ -190,6 +187,7 @@ for round in tqdm(range(num_rounds)):
             "upper_bound_mi": upper_bound_mi,
             "global_accuracy": accuracy,
             "aggregation_size": len(round_models),
+            "mifl_critical_value": mifl_critical_value,
         }
     )
 

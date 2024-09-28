@@ -21,7 +21,7 @@ CONDA_BASE=$(conda info --base)
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 
 # Activate the specified conda environment
-conda activate anshul
+conda activate dynamifl
 
 # Run the Python script n times
 for ((i=1; i<=NUM_RUNS; i++)); do
