@@ -2,7 +2,7 @@ import torch
 from torch import optim
 import wandb
 from flwr_datasets.partitioner import DirichletPartitioner
-from common import federated_averaging
+from utils.common import federated_averaging
 from models.simple_cnn import SimpleCNN
 from workloads.cifar100 import (
     calculate_mi,
