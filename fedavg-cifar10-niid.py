@@ -1,14 +1,14 @@
 import torch
 from torch import optim
 import wandb
-from flwr_datasets.partitioner import IidPartitioner
+from flwr_datasets.partitioner import DirichletPartitioner
 from utils import client_fedavg_update, federated_averaging, evaluate, calculate_mi
 from models.simple_cnn import SimpleCNN
 from workloads.cifar10 import load_dataset, process_batch
 import random
 from tqdm import tqdm
 
-DEVICE_ARG = "cuda:0"
+DEVICE_ARG = "cuda:1"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 
 print(f"Device: {DEVICE}")
@@ -24,7 +24,7 @@ aggregation_size = participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project=f"experiment-fedavg-cifar10-iid",
+    project=f"experiment-fedavg-cifar10-niid",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -35,14 +35,14 @@ wandb.init(
     },
 )
 
-partitioner = IidPartitioner(
-    num_partitions=num_clients
+partitioner = DirichletPartitioner(
+    num_partitions=num_clients, partition_by="label", alpha=partition_alpha
 )
 
 test_loader, get_client_loader = load_dataset(partitioner)
 
-global_model = SimpleCNN().to(DEVICE)
-local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
+global_model = SimpleCNN(num_classes=10).to(DEVICE)
+local_models = [SimpleCNN(num_classes=10).to(DEVICE) for _ in range(num_clients)]
 
 
 for round in tqdm(range(num_rounds)):
@@ -52,7 +52,7 @@ for round in tqdm(range(num_rounds)):
     round_models = []
     for client_idx in participating_clients:
         trainloader, valloader = get_client_loader(client_idx)
-        model = SimpleCNN()
+        model = SimpleCNN(num_classes=10)
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
         ce_loss_sum, total_loss_sum = client_fedavg_update(
             model,

@@ -46,6 +46,6 @@ def load_dataset(partitioners, batch_size=64, test_size=0.1):
     return testloader, get_client_loader
 
 def process_batch(batch):
-    return batch["img"], batch["fine_label"]
+    return batch["img"], batch["label"]
 
 

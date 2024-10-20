@@ -17,11 +17,11 @@ if [[ ! -f "$PYTHON_FILE" || "${PYTHON_FILE##*.}" != "py" ]]; then
 fi
 
 # Initialize conda for the current shell session
-CONDA_BASE=$(conda info --base)
-source "$CONDA_BASE/etc/profile.d/conda.sh"
+# CONDA_BASE=$(conda info --base)
+# source "$CONDA_BASE/etc/profile.d/conda.sh"
 
 # Activate the specified conda environment
-conda activate nectar
+# conda activate nectar
 
 # Run the Python script n times
 for ((i=1; i<=NUM_RUNS; i++)); do
