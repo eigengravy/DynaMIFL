@@ -23,7 +23,7 @@ aggregation_size = participation_fraction * num_clients
 wandb.login()
 
 wandb.init(
-    project=f"x-experiment-fedavg-cifar10-iid",
+    project=f"x-experiment-fedavg-cifar10-iid-mi-sampling-top",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -42,10 +42,15 @@ test_loader, get_client_loader = load_dataset(partitioner)
 global_model = SimpleCNN(num_classes=10).to(DEVICE)
 local_models = [SimpleCNN(num_classes=10).to(DEVICE) for _ in range(num_clients)]
 
+local_mis = [1] * num_clients
 
 for round in tqdm(range(num_rounds)):
-    num_participating_clients = max(1, int(participation_fraction * num_clients))
-    participating_clients = random.sample(range(num_clients), num_participating_clients)
+    if round < 10:
+        num_participating_clients = num_clients
+        participating_clients = random.sample(range(num_clients), num_participating_clients)
+    else:
+        num_participating_clients = max(1, int(participation_fraction * num_clients))
+        participating_clients = random.choices(population=range(num_clients), k=num_participating_clients, weights=[1/x for x in local_mis])
 
     round_models = []
     for client_idx in participating_clients:
@@ -66,6 +71,8 @@ for round in tqdm(range(num_rounds)):
 
         test_loss, accuracy = evaluate(model, valloader, DEVICE, process_batch)
         mi = calculate_mi(model, local_models[client_idx], valloader, DEVICE, process_batch)
+        if round < 10:
+            local_mis[client_idx] += mi
         local_models[client_idx].load_state_dict(model.state_dict())
 
         wandb.log(

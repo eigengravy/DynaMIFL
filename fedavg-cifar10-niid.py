@@ -8,29 +8,29 @@ from workloads.cifar10 import load_dataset, process_batch
 import random
 from tqdm import tqdm
 
-DEVICE_ARG = "cuda:1"
+DEVICE_ARG = "cuda:0"
 DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
 
 print(f"Device: {DEVICE}")
 
 num_clients = 100
-num_rounds = 100
+num_rounds = 500
 local_epochs = 5
-batch_size = 32
-partition_alpha = 0.5
+batch_size = 64
 participation_fraction = 0.1
+partition_alpha = 0.5
 aggregation_size = participation_fraction * num_clients
 
 wandb.login()
 
 wandb.init(
-    project=f"experiment-fedavg-cifar10-niid",
+    project=f"x-experiment-fedavg-cifar10-niid",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
         "local_epochs": local_epochs,
         "batch_size": batch_size,
-        "parition_alpha": partition_alpha,
+        "partition_alpha": partition_alpha,
         "participation_fraction": participation_fraction,
     },
 )
@@ -53,7 +53,7 @@ for round in tqdm(range(num_rounds)):
     for client_idx in participating_clients:
         trainloader, valloader = get_client_loader(client_idx)
         model = SimpleCNN(num_classes=10)
-        optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+        optimizer = optim.SGD(model.parameters(), lr=0.1*((0.99)**round))
         ce_loss_sum, total_loss_sum = client_fedavg_update(
             model,
             global_model,
@@ -67,7 +67,7 @@ for round in tqdm(range(num_rounds)):
         round_models.append(model)
 
         test_loss, accuracy = evaluate(model, valloader, DEVICE, process_batch)
-        mi = calculate_mi(model, local_models[client_idx], trainloader, DEVICE, process_batch)
+        mi = calculate_mi(model, local_models[client_idx], valloader, DEVICE, process_batch)
         local_models[client_idx].load_state_dict(model.state_dict())
 
         wandb.log(
