@@ -1,15 +1,10 @@
 import torch
 from torch import optim
 import wandb
-from flwr_datasets.partitioner import DirichletPartitioner
-from utils.common import federated_averaging
+from flwr_datasets.partitioner import IidPartitioner
+from utils import client_fedavg_update, federated_averaging, evaluate, calculate_mi
 from models.simple_cnn import SimpleCNN
-from workloads.cifar100 import (
-    calculate_mi,
-    evaluate,
-    load_dataset,
-    client_fedavg_update,
-)
+from workloads.cifar10 import load_dataset, process_batch
 import random
 from tqdm import tqdm
 
@@ -22,14 +17,14 @@ num_clients = 100
 num_rounds = 100
 local_epochs = 5
 batch_size = 32
-partition_alpha = 0.1
-participation_fraction = 0.3
-aggregation_size = 0.8 * participation_fraction * num_clients
+partition_alpha = 0.5
+participation_fraction = 0.1
+aggregation_size = participation_fraction * num_clients
 
 wandb.login()
 
 wandb.init(
-    project="srs-fedavg",
+    project=f"experiment-fedavg-cifar10-iid",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -40,8 +35,8 @@ wandb.init(
     },
 )
 
-partitioner = DirichletPartitioner(
-    num_partitions=num_clients, partition_by="fine_label", alpha=partition_alpha
+partitioner = IidPartitioner(
+    num_partitions=num_clients
 )
 
 test_loader, get_client_loader = load_dataset(partitioner)
@@ -67,11 +62,12 @@ for round in tqdm(range(num_rounds)):
             optimizer,
             local_epochs,
             DEVICE,
+            process_batch
         )
         round_models.append(model)
 
-        test_loss, accuracy = evaluate(model, valloader, DEVICE)
-        mi = calculate_mi(model, local_models[client_idx], trainloader, DEVICE)
+        test_loss, accuracy = evaluate(model, valloader, DEVICE, process_batch)
+        mi = calculate_mi(model, local_models[client_idx], trainloader, DEVICE, process_batch)
         local_models[client_idx].load_state_dict(model.state_dict())
 
         wandb.log(
@@ -89,7 +85,7 @@ for round in tqdm(range(num_rounds)):
 
     round_models = round_models[: int(aggregation_size)]
     federated_averaging(global_model, round_models, DEVICE)
-    test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
+    test_loss, accuracy = evaluate(global_model, test_loader, DEVICE, process_batch)
     wandb.log(
         {
             "global_loss": test_loss,

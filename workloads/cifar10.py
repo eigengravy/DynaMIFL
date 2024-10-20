@@ -1,9 +1,3 @@
-import math
-from typing import Tuple
-
-import numpy as np
-import torch
-import torch.nn as nn
 from flwr_datasets import FederatedDataset
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Lambda, Normalize, ToTensor
@@ -12,7 +6,7 @@ from torchvision.transforms import Compose, Lambda, Normalize, ToTensor
 def load_dataset(partitioners, batch_size=64, test_size=0.1):
 
     fds = FederatedDataset(
-        dataset="cifar100",
+        dataset="cifar10",
         partitioners={"train": partitioners},
     )
 
