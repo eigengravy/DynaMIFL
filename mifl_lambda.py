@@ -7,19 +7,19 @@ from models.simple_cnn import SimpleCNN
 from workloads.cifar100 import (
     calculate_mi,
     client_fedavg_update,
-    client_mifl_update,
     client_mifl_update_anshul,
     evaluate,
     load_dataset,
 )
 import random
 import numpy as np
+import os
 from tqdm import tqdm
-from opacus import PrivacyEngine
+import opacus
 
 DEVICE_ARG = "cuda:0"
-#DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
-DEVICE = torch.device("mps")
+# DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("mps" if torch.has_mps else DEVICE_ARG)
 
 print(f"Device: {DEVICE}")
 
@@ -36,8 +36,7 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 
 wandb.login()
 
-client_mi = [[1] for _ in range(num_clients)] 
-
+client_mi = [[1] for _ in range(num_clients)]
 
 wandb.init(
     project="privacy",
@@ -46,7 +45,7 @@ wandb.init(
         "num_rounds": num_rounds,
         "local_epochs": local_epochs,
         "batch_size": batch_size,
-        "parition_alpha": partition_alpha,
+        "partition_alpha": partition_alpha,
         "mifl_lambda": mifl_lambda,
         "mifl_clamp": mifl_clamp,
         "mifl_critical_value": mifl_critical_value,
@@ -64,46 +63,55 @@ global_model = SimpleCNN().to(DEVICE)
 local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
 
 for round in tqdm(range(num_rounds)):
-
     def calculate_client_probabilities(client_mi, num_clients):
         inverse_mean = np.zeros(num_clients)
         prob_mi = np.zeros(num_clients)
 
         for client_idx in range(num_clients):
             mean_mi = np.mean(client_mi[client_idx])
-            if mean_mi != 0:
-                inverse_mean[client_idx] = 1 / mean_mi
-            else:
-                inverse_mean[client_idx] = 0  
+            inverse_mean[client_idx] = 1 / mean_mi if mean_mi != 0 else 0
 
         sum_prob = np.sum(inverse_mean)
-
-        if sum_prob != 0:
-            prob_mi = inverse_mean / sum_prob
-        else:
-            prob_mi = np.ones(num_clients) / num_clients  
+        prob_mi = inverse_mean / sum_prob if sum_prob != 0 else np.ones(num_clients) / num_clients
 
         return prob_mi.tolist()
-    
+
     prob_mi = calculate_client_probabilities(client_mi, num_clients)
-    
+
     num_participating_clients = max(1, int(participation_fraction * num_clients))
     if round == 0:
         participating_clients = random.sample(range(num_clients), num_participating_clients)
     else:
-        participating_clients = np.random.choice(range(num_clients) , num_participating_clients , prob_mi)
-
-    prob_mi = []
-
+        participating_clients = np.random.choice(range(num_clients), num_participating_clients, p=prob_mi)
 
     round_models = []
     round_mis = []
+
     for client_idx in participating_clients:
         trainloader, valloader = get_client_loader(client_idx)
         model = SimpleCNN()
+
+        # Load the model state if the file exists
+        if os.path.exists(f"SCNN{client_idx}.pth"):
+            model.load_state_dict(torch.load(f"SCNN{client_idx}.pth"), strict=False)
+            print(f"Loaded model for client {client_idx} from SCNN{client_idx}.pth.")
+        else:
+            print(f"Model for client {client_idx} not found. Using global model instead.")
+            model.load_state_dict(global_model.state_dict())
+            model_path = f"{client_idx}.pth"
+
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-        privacy_engine = PrivacyEngine()
-        model , optimizer , trainloader = privacy_engine.attach(model , optimizer , trainloader)
+        privacy_engine = opacus.PrivacyEngine()
+        model, optimizer, trainloader = privacy_engine.make_private(
+            module=model,
+            optimizer=optimizer,
+            data_loader=trainloader,
+            noise_multiplier=1.0,
+            max_grad_norm=1.0,
+        )
+
+        model.to(DEVICE)
+
         if round == 0:
             ce_loss_sum, total_loss_sum = client_fedavg_update(
                 model,
@@ -112,7 +120,7 @@ for round in tqdm(range(num_rounds)):
                 trainloader,
                 optimizer,
                 local_epochs,
-                DEVICE
+                DEVICE,
             )
             mi_loss_sum = 0
         else:
@@ -128,6 +136,7 @@ for round in tqdm(range(num_rounds)):
                 mifl_clamp,
                 mifl_lambda,
             )
+
         round_models.append(model)
         test_loss, accuracy = evaluate(model, valloader, DEVICE)
         mi = calculate_mi(model, local_models[client_idx], trainloader, DEVICE)
@@ -137,7 +146,7 @@ for round in tqdm(range(num_rounds)):
         # Update MI and mean for the current client
         client_mi[client_idx].append(mi)
         print(client_mi)
-        
+
         wandb.log(
             {
                 str(client_idx): {
@@ -151,11 +160,18 @@ for round in tqdm(range(num_rounds)):
             },
             commit=False,
         )
-        
-    
 
-    # print(f"Round {round}")
-    # print(f"{len(round_models)} {round_mis}")
+        # Save the original state_dict
+        original_state_dict = model.state_dict()
+        
+        # Create a new state_dict without the _module. prefix
+        modified_state_dict = {f"_module.{k}": v for k, v in original_state_dict.items()}
+        
+        # Save the modified state_dict
+        torch.save(modified_state_dict, f"SCNN{client_idx}.pth")
+        print(f"Model for client {client_idx} saved to SCNN{client_idx}.pth")
+
+    # Calculate MI bounds for selection
     lower_bound_mi = np.nanpercentile(round_mis, mifl_critical_value * 100)
     upper_bound_mi = np.nanpercentile(round_mis, (1 - mifl_critical_value) * 100)
     merged = [
@@ -165,6 +181,8 @@ for round in tqdm(range(num_rounds)):
     ]
     merged.sort()
     round_models = [_model for (_mi, _model) in merged[: int(aggregation_size)]]
+
+    # Perform federated averaging
     federated_averaging(global_model, round_models, DEVICE)
     test_loss, accuracy = evaluate(global_model, test_loader, DEVICE)
     wandb.log(
@@ -176,4 +194,3 @@ for round in tqdm(range(num_rounds)):
             "aggregation_size": len(round_models),
         }
     )
-
