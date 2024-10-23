@@ -13,7 +13,7 @@ from torchvision.transforms import Compose, Lambda, Normalize, ToTensor
 from scipy.stats import kendalltau
 import math
 
-#mine = MINE()
+
 
 
 def load_dataset(partitioners, batch_size=64, test_size=0.1):
@@ -198,71 +198,14 @@ def client_mifl_update_anshul(
             mi_loss = nn.functional.cross_entropy(outputs, local_ouputs)
             mi_loss = torch.clamp(mi_loss, min=min_clamp, max=max_clamp)
             mi_loss_sum += mi_loss.item()
-            loss = ce_loss - calculate_lambda_anshul2(outputs, local_ouputs) * mi_loss
+            loss = ce_loss - calculate_lambda_anshul(outputs, local_ouputs) * mi_loss
             total_loss_sum += loss.item()
             loss.backward()
             optimizer.step()
     return ce_loss_sum, mi_loss_sum, total_loss_sum
 
 
-def calculate_lambda_anshul(logits_g , logits_k):
-    logits_g = logits_g.float()
-    logits_k = logits_k.float()
-    mean_logits = (logits_g + logits_k) / 2
-    
-    deviation_g = logits_g - mean_logits
-    deviation_k = logits_k - mean_logits
-    
-    covariance = torch.mean(deviation_g * deviation_k)
-    sum_logits = logits_g.abs() + logits_k.abs()
-    cv = covariance.sum()/sum_logits.sum()
-    
-    lambda_val = torch.where(cv <= 0.5, cv, 1 - cv)
-    
-    return lambda_val
-
-def knn_entropy(X, k=3):
-    """
-    Estimate the entropy of continuous random variable X using k-nearest neighbors.
-    X: PyTorch tensor of shape (n_samples, n_features)
-    k: Number of nearest neighbors
-    Returns: Entropy estimate
-    """
-    n = X.shape[0]
-    
-    # Pairwise distances between points in X
-    dist = torch.cdist(X, X, p=2)
-    
-    # Sort distances and get the distance to the k-th nearest neighbor
-    knn_distances, _ = torch.topk(dist, k+1, largest=False)  # k+1 because the closest point is itself
-    knn_distance = knn_distances[:, k]  # k-th nearest neighbor distance
-    
-    # Compute entropy using KNN estimate
-    volume_unit_ball = (math.pi ** (X.shape[1] / 2)) / math.gamma(X.shape[1] / 2 + 1)  # Volume of d-dimensional unit ball
-    entropy_estimate = - torch.mean(torch.log(knn_distance)) + torch.log(torch.tensor(volume_unit_ball)) + math.log(n) - math.log(k)
-    
-    return entropy_estimate
-
-# Function to estimate mutual information using KNN
-def mutual_information(X, Y, k=3):
-    """
-    Estimate the mutual information between continuous variables X and Y using k-nearest neighbors.
-    X: PyTorch tensor of shape (n_samples, n_features)
-    Y: PyTorch tensor of shape (n_samples, n_features)
-    k: Number of nearest neighbors
-    Returns: Mutual information estimate
-    """
-    H_X = knn_entropy(X, k)      # Entropy of X
-    H_Y = knn_entropy(Y, k)      # Entropy of Y
-    H_XY = knn_entropy(torch.cat([X, Y], dim=1), k)  # Joint entropy of X and Y
-    
-    # Mutual information
-    MI = H_X + H_Y - H_XY
-    
-    return MI
-
-
-def calculate_lambda_anshul2(logits_g, logits_k , k=3):
+def calculate_lambda_anshul(logits_g, logits_k , k=3):
     logits_g = logits_g.float()
     logits_k = logits_k.float()
 

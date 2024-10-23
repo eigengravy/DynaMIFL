@@ -15,7 +15,7 @@ from workloads.cifar100 import (
 import random
 import numpy as np
 from tqdm import tqdm
-
+from opacus import PrivacyEngine
 
 DEVICE_ARG = "cuda:0"
 #DEVICE = torch.device(DEVICE_ARG if torch.cuda.is_available() else "cpu")
@@ -36,14 +36,11 @@ aggregation_size = 0.8 * participation_fraction * num_clients
 
 wandb.login()
 
-client_mi = [[1] for _ in range(num_clients)]  # Each client has its own list of MI values
-# mean_mi = [1 for _ in range(num_clients)]
-inverse_mean = np.zeros(num_clients)
-prob_mi = [1/(num_clients) for _ in range(num_clients)]  # 1D list of probabilities
+client_mi = [[1] for _ in range(num_clients)] 
 
 
 wandb.init(
-    project="test",
+    project="privacy",
     config={
         "num_clients": num_clients,
         "num_rounds": num_rounds,
@@ -68,14 +65,6 @@ local_models = [SimpleCNN().to(DEVICE) for _ in range(num_clients)]
 
 for round in tqdm(range(num_rounds)):
 
-    # for client_idx in range(num_clients):
-    #     mean_mi = np.mean(client_mi[client_idx])
-    #     inverse_mean[client_idx-1] = 1 / mean_mi
-    # sum_prob = np.sum(inverse_mean)
-    # for client_idx in range(num_clients):
-    #     prob_mi[client_idx] = inverse_mean[client_idx] / sum_prob
-    
-    # print(prob_mi)
     def calculate_client_probabilities(client_mi, num_clients):
         inverse_mean = np.zeros(num_clients)
         prob_mi = np.zeros(num_clients)
@@ -85,14 +74,14 @@ for round in tqdm(range(num_rounds)):
             if mean_mi != 0:
                 inverse_mean[client_idx] = 1 / mean_mi
             else:
-                inverse_mean[client_idx] = 0  # or handle this case as appropriate
+                inverse_mean[client_idx] = 0  
 
         sum_prob = np.sum(inverse_mean)
 
         if sum_prob != 0:
             prob_mi = inverse_mean / sum_prob
         else:
-            prob_mi = np.ones(num_clients) / num_clients  # Equal probabilities if sum is zero
+            prob_mi = np.ones(num_clients) / num_clients  
 
         return prob_mi.tolist()
     
@@ -104,9 +93,8 @@ for round in tqdm(range(num_rounds)):
     else:
         participating_clients = np.random.choice(range(num_clients) , num_participating_clients , prob_mi)
 
-    # mean_mi.clear()
     prob_mi = []
-    inverse_mean = []
+
 
     round_models = []
     round_mis = []
@@ -114,6 +102,8 @@ for round in tqdm(range(num_rounds)):
         trainloader, valloader = get_client_loader(client_idx)
         model = SimpleCNN()
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+        privacy_engine = PrivacyEngine()
+        model , optimizer , trainloader = privacy_engine.attach(model , optimizer , trainloader)
         if round == 0:
             ce_loss_sum, total_loss_sum = client_fedavg_update(
                 model,
